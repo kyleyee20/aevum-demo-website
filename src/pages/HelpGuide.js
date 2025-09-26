@@ -2,11 +2,11 @@ import { useState } from "react";
 
 export default function HelpGuide() {
     const images = [
-        "/photos/step1.png",
-        "/photos/step2.png",
-        "/photos/step3.png",
-        "/photos/step4.png",
-        "/photos/step5.png",
+        "/public/photos/step1.png",
+        "/public/photos/step2.png",
+        "/public/photos/step3.png",
+        "/public/photos/step4.png",
+        "/public/photos/step5.png",
     ];
 
     const [current, setCurrent] = useState(0);
