@@ -1,116 +1,135 @@
-/* Navbar */
-.navbar {
-  background-color: red;
-  /* theme color */
-  padding: 10px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* ================== General ================== */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  color: #333;
 }
 
-.logo {
-  color: white;
-}
-
-.nav-links {
-  list-style: none;
-  display: flex;
-  gap: 20px;
-}
-
-.nav-links a {
-  color: white;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.nav-links a:hover {
-  text-decoration: underline;
-}
-
-/* General container */
 .container {
   padding: 20px;
 }
 
-.text-center {
+h1,
+h2 {
+  margin-bottom: 20px;
+}
+
+/* ================== Navbar ================== */
+.navbar {
+  display: flex;
+  background-color: #007bff;
+  padding: 10px 20px;
+  align-items: center;
+}
+
+.navbar a {
+  color: white;
+  text-decoration: none;
+  margin-right: 20px;
+  font-weight: bold;
+}
+
+.navbar a:hover {
+  text-decoration: underline;
+}
+
+/* ================== Home Page ================== */
+.calendar-placeholder {
+  border: 2px dashed #ccc;
+  padding: 40px;
+  border-radius: 10px;
+  background-color: #fff;
+  margin-bottom: 30px;
   text-align: center;
 }
 
-/* Calendar placeholder */
-.calendar-placeholder {
-  border: 2px solid #ccc;
-  padding: 40px;
+.feedback-container {
   margin-top: 20px;
 }
 
-/* Feedback button area */
-.feedback-container {
-  margin-top: 40px;
-}
-
-button {
-  background-color: red;
+/* Feedback button styled like navbar button */
+.feedback-link {
+  display: inline-block;
+  background-color: #28a745;
   color: white;
-  border: none;
-  padding: 10px 20px;
+  padding: 10px 25px;
   border-radius: 8px;
-  cursor: pointer;
+  text-decoration: none;
+  font-weight: bold;
+  transition: opacity 0.2s ease;
 }
 
-button:hover {
+.feedback-link:hover {
   opacity: 0.8;
 }
 
-/* Help guide */
-.help-card {
-  display: inline-block;
-  padding: 20px;
-}
-
-.carousel {
+/* ================== Account Page ================== */
+.account-form {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  background: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
-.help-image {
-  max-width: 90%;
-  height: auto;
-  margin: 0 10px;
+.account-form input[type="text"],
+.account-form input[type="email"],
+.account-form input[type="file"] {
+  margin-bottom: 15px;
+  padding: 10px;
+  width: 300px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
 }
 
-/* Priority list */
-.priority-list {
-  list-style: none;
-  padding: 0;
+.save-button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-/* Help Guide styles */
+.save-button:hover {
+  opacity: 0.8;
+}
+
+/* ================== Help Guide ================== */
 .help-container {
   text-align: center;
   padding: 20px;
+  min-height: 80vh;
+  background-color: #f9f9f9;
 }
 
 .help-card {
   display: inline-block;
   padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  background: #fff;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  margin-top: 20px;
 }
 
 .help-carousel {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 20px 0;
 }
 
 .help-image {
   max-width: 80%;
   max-height: 70vh;
-  margin: 0 10px;
   border-radius: 8px;
+  margin: 0 10px;
+  object-fit: contain;
 }
 
 .help-arrow {
@@ -119,9 +138,51 @@ button:hover {
   font-size: 2rem;
   cursor: pointer;
   padding: 10px;
+  color: #333;
+  transition: color 0.2s ease;
 }
 
 .help-arrow:hover {
   color: red;
-  /* change if you want different hover color */
+}
+
+.help-step {
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* ================== Feedback Page ================== */
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.feedback-form textarea {
+  width: 400px;
+  height: 150px;
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  resize: vertical;
+}
+
+.submit-button {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.submit-button:hover {
+  opacity: 0.8;
 }
