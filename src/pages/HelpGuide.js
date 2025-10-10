@@ -1,9 +1,9 @@
 import { useState } from "react";
-import step1 from "../photos/step1.png";
-import step2 from "../photos/step2.png";
-import step3 from "../photos/step3.png";
-import step4 from "../photos/step4.png";
-import step5 from "../photos/step5.png";
+import step1 from "../pages/photos/step1.png";
+import step2 from "../pages/photos/step2.png";
+import step3 from "../pages/photos/step3.png";
+import step4 from "../pages/photos/step4.png";
+import step5 from "../pages/photos/step5.png";
 
 export default function HelpGuide() {
     const images = [step1, step2, step3, step4, step5];

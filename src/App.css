@@ -19,19 +19,40 @@ h2 {
 /* Navbar container */
 .navbar {
   display: flex;
-  justify-content: flex-end;
-  /* push links to the right */
+  justify-content: space-between; /* Pushes title left, links right */
+  align-items: center;
   background-color: #007bff;
   padding: 10px 20px;
-  align-items: center;
 }
 
-/* Navbar links wrapper */
-.navbar-links {
-  display: flex;
-  gap: 20px;
-  /* space between links */
+.nav-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;          /* Aligns links horizontally */
+  gap: 20px;              /* Space between links */
 }
+
+.nav-links li {
+  list-style-type: none;
+}
+
+/* Remove any marker pseudo elements */
+.navbar-links li::marker {
+  content: none !important;
+}
+
+.navbar-links li::before {
+  content: none !important;
+  display: none !important;
+}
+
+
+/* Optionally also target ::marker to be safe */
+.navbar-links li::marker {
+  content: none;
+}
+
 
 /* Navbar links styling */
 .navbar a {
@@ -42,10 +63,13 @@ h2 {
   border-radius: 5px;
   transition: background-color 0.2s ease;
 }
-
-.navbar a:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+ul, li {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
+
+
 
 /* ================== Home Page ================== */
 .calendar-placeholder {
