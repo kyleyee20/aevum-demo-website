@@ -23,6 +23,9 @@ function App() {
           <li>
             <Link to="/help">Help Guide</Link>
           </li>
+          <li>
+            <Link to="/account">Account</Link>
+          </li>
         </ul>
       </nav>
 
