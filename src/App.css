@@ -222,3 +222,72 @@ ul, li {
 .submit-button:hover {
   opacity: 0.8;
 }
+
+/* ================== Priority List Table ================== */
+table {
+  width: 100%;
+  margin: 20px 0;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #007bff;
+  color: white;
+}
+
+button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+button:hover {
+  opacity: 0.8;
+}
+
+button:disabled {
+  background-color: #cccccc;
+}
+
+/* ================== Form Inputs and Buttons ================== */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+select {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  width: auto; /* Change this from 100% to auto to match previous size */
+}
+
+select {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+  width: auto; /* Ensure it's not taking full width */
+  display: inline-block; /* This keeps the dropdown from taking full width */
+}
+
+h1, h2 {
+  margin-bottom: 20px;
+}
+
+.container {
+  padding: 20px;
+}
+
+h2 {
+  margin-top: 40px;
+}
