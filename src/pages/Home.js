@@ -39,7 +39,7 @@ export default function Home({ calendarEvents }) {
 
   return (
     <div className="container" style={{ height: "80vh" }}>
-      <h1>Welcome to the Demo Website</h1>
+      <h1>Weclome to Aevumm</h1>
 
       {/* React Big Calendar */}
       <Calendar
