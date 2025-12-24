@@ -42,7 +42,7 @@ function App() {
       const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,  // Use OAuth token in the Authorization header
+          'Authorization': `Bearer ${token}`,  // Ensure the token is passed correctly
         },
       });
 
@@ -101,7 +101,7 @@ function App() {
             <GoogleLogin
               onSuccess={handleLoginSuccess}
               onError={handleLoginFailure}
-              scope="https://www.googleapis.com/auth/calendar.readonly"  // Add the calendar scope
+              scope="https://www.googleapis.com/auth/calendar"  // Add the calendar scope
               uxMode="popup"  // Open login in a popup window
             />
           ) : (
