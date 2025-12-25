@@ -7,44 +7,56 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 const localizer = momentLocalizer(moment);
 
 export default function Home({ calendarEvents }) {
-  const [events, setEvents] = useState([]); // State to store calendar events
+  const [events, setEvents] = useState([]);
 
-  // Load events from localStorage and merge with Google Calendar events
   useEffect(() => {
     const loadedEvents = JSON.parse(localStorage.getItem("calendarEvents") || "[]");
 
-    // Format localStorage events to ensure they have proper Date objects
+    // Format localStorage events
     const formattedLocalStorageEvents = loadedEvents.map((event) => ({
-      ...event,
-      start: new Date(event.start), // Ensure start is a Date object
-      end: new Date(event.end), // Ensure end is a Date object
+      id: event.id || `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: event.title || 'Local Event',
+      start: new Date(event.start),
+      end: new Date(event.end),
+      allDay: event.allDay || false,
     }));
 
-    // Format Google Calendar events (props) to ensure start and end are Date objects
-    const formattedGoogleCalendarEvents = calendarEvents.map((event) => ({
-      ...event,
-      start: new Date(event.start.dateTime || event.start.date),  // Use dateTime or date
-      end: new Date(event.end.dateTime || event.end.date),  // Use dateTime or date
-    }));
+    // UNIFIED MAPPING - handles Google, Priority, and mixed events
+    const formattedCalendarEvents = calendarEvents.map((event) => {
+      if (event.isPriority || event.title) {
+        // Priority/AI events or events with direct title property
+        return {
+          id: event.id,
+          title: event.title || 'Priority Event',
+          start: new Date(event.start),
+          end: new Date(event.end),
+          allDay: event.allDay || false,
+        };
+      } else {
+        // Google Calendar events
+        return {
+          id: event.id,
+          title: event.summary || 'No title',
+          start: new Date(event.start.dateTime || event.start.date),
+          end: new Date(event.end.dateTime || event.end.date),
+        };
+      }
+    });
 
-    // Merge both localStorage events and Google Calendar events
-    const allEvents = [...formattedLocalStorageEvents, ...formattedGoogleCalendarEvents];
-
-    // Log the merged events for debugging
-    console.log("Merged Events:", allEvents);
-
-    // Update state with the merged events
+    const allEvents = [...formattedLocalStorageEvents, ...formattedCalendarEvents];
+    console.log("Raw calendarEvents from App:", calendarEvents);
+    console.log("Formatted events count:", allEvents.length);
+    console.log("First few events:", allEvents.slice(0, 3));
     setEvents(allEvents);
-  }, [calendarEvents]); // Re-run whenever calendarEvents (Google events) change
+  }, [calendarEvents]);
 
   return (
     <div className="container" style={{ height: "80vh" }}>
-      <h1>Weclome to Aevumm</h1>
+      <h1>Welcome to Aevumm</h1>
 
-      {/* React Big Calendar */}
       <Calendar
         localizer={localizer}
-        events={events} // Events passed here
+        events={events}
         startAccessor="start"
         endAccessor="end"
         style={{ height: 500, margin: "20px 0" }}
