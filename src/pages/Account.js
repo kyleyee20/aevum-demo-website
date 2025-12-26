@@ -1,269 +1,326 @@
 import React, { useState, useEffect } from "react";
 
 export default function Account() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [school, setSchool] = useState("");
-  const [picture, setPicture] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login state
-  const [loginName, setLoginName] = useState("");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginSchool, setLoginSchool] = useState("");
-  const [createAccountMode, setCreateAccountMode] = useState(false);
+  const [courseProfiles, setCourseProfiles] = useState([]);
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [schoolVocab, setSchoolVocab] = useState({});
+  const availableSchools = ["UCSD", "UCI"];
+  const [newCategory, setNewCategory] = useState("");
+  const [newStrength, setNewStrength] = useState(5);
+  const [newNotes, setNewNotes] = useState("");
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("name");
-    const savedEmail = localStorage.getItem("email");
-    const savedSchool = localStorage.getItem("school");
-    const savedPicture = localStorage.getItem("picture");
-    const savedLoginStatus = localStorage.getItem("isLoggedIn");
+    const checkLoginStatus = () => {
+      const googleToken = localStorage.getItem("google_access_token");
+      setIsSignedIn(!!googleToken);
 
-    if (savedLoginStatus === "true") {
-      setIsLoggedIn(true);
-      setName(savedName);
-      setEmail(savedEmail);
-      setSchool(savedSchool);
-      if (savedPicture) {
-        setPicture(savedPicture);
+      const savedProfiles = localStorage.getItem("courseProfiles");
+      const savedSchool = localStorage.getItem("selectedSchool");
+      const savedVocab = localStorage.getItem("schoolVocab");
+
+      if (savedProfiles) {
+        try {
+          setCourseProfiles(JSON.parse(savedProfiles));
+        } catch {
+          console.error("Failed to parse saved profiles");
+        }
       }
-      // Log the logged-in user info
-      console.log("Logged in user info:", { savedName, savedEmail, savedSchool, savedPicture });
-    }
 
-    // Log the data saved in localStorage for debugging
-    console.log("LocalStorage data:", {
-      savedName,
-      savedEmail,
-      savedSchool,
-      savedPicture,
-      savedLoginStatus,
-    });
+      if (savedSchool) {
+        setSelectedSchool(savedSchool);
+        if (googleToken) loadSchoolVocab(savedSchool);
+      }
+
+      if (savedVocab) {
+        
+        try {
+          setSchoolVocab(JSON.parse(savedVocab));
+        } catch {
+          console.error("Failed to parse saved vocab");
+        }
+      }
+    };
+
+    checkLoginStatus();
+    const interval = setInterval(checkLoginStatus, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const handleSave = (e) => {
+  useEffect(() => {
+    if (isSignedIn) {
+      localStorage.setItem("courseProfiles", JSON.stringify(courseProfiles));
+      localStorage.setItem("selectedSchool", selectedSchool);
+      localStorage.setItem("schoolVocab", JSON.stringify(schoolVocab));
+    }
+  }, [courseProfiles, selectedSchool, schoolVocab, isSignedIn]);
+
+  const loadSchoolVocab = async (school) => {
+    try {
+      const res = await fetch(`/schools/${school.toLowerCase()}_courses.json`);
+      const data = await res.json();
+      const vocab = {};
+      let current = null;
+
+      data.forEach((item) => {
+        const category = item["Table 1"];
+        const course = item["Unnamed: 1"];
+        if (category && category.trim()) current = category.trim();
+        if (course && course.trim()) {
+          if (!vocab[current]) vocab[current] = [];
+          vocab[current].push(course.trim());
+        }
+      });
+
+      setSchoolVocab(vocab);
+
+          // 👇 ADD THIS ONE LINE:
+    localStorage.setItem("schoolVocab", JSON.stringify(vocab));
+    } catch (err) {
+      console.error(`Failed to load ${school} vocab:`, err);
+    }
+  };
+
+  const handleSchoolChange = (e) => {
+    const school = e.target.value;
+    setSelectedSchool(school);
+    if (school && isSignedIn) loadSchoolVocab(school);
+  };
+
+  const handleAddCategory = (e) => {
     e.preventDefault();
-    localStorage.setItem("name", name.trim());
-    localStorage.setItem("email", email.trim());
-    localStorage.setItem("school", school.trim());
-    if (picture) {
-      const pictureURL = URL.createObjectURL(picture);
-      localStorage.setItem("picture", pictureURL);
-    }
-    // Log the saved account info
-    console.log("Account saved:", { name, email, school, picture });
+    if (!isSignedIn || !newCategory.trim()) return;
+
+    const newProfile = {
+      id: `cat_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      category: newCategory.trim(),
+      strength: Number(newStrength),
+      notes: newNotes.trim(),
+    };
+
+    setCourseProfiles((prev) => [...prev, newProfile]);
+    setNewCategory("");
+    setNewStrength(5);
+    setNewNotes("");
   };
 
-  const handleLogin = () => {
-    // Retrieve data from localStorage
-    const savedName = localStorage.getItem("name");
-    const savedEmail = localStorage.getItem("email");
-    const savedSchool = localStorage.getItem("school");
-
-    // Trim input values to avoid spaces causing login to fail
-    const loginNameTrimmed = loginName.trim();
-    const loginEmailTrimmed = loginEmail.trim();
-    const loginSchoolTrimmed = loginSchool.trim();
-
-    // Log data for debugging
-    console.log("Login check:", { savedName, savedEmail, savedSchool, loginNameTrimmed, loginEmailTrimmed, loginSchoolTrimmed });
-
-    // Check if entered login credentials match stored ones
-    if (
-      loginNameTrimmed === savedName?.trim() &&
-      loginEmailTrimmed === savedEmail?.trim() &&
-      loginSchoolTrimmed === savedSchool?.trim()
-    ) {
-      setIsLoggedIn(true); // Set to true if login is successful
-      localStorage.setItem("isLoggedIn", "true"); // Store login status in localStorage
-      console.log("Login successful! User info:", { savedName, savedEmail, savedSchool });
-
-      setName(savedName);
-      setEmail(savedEmail);
-      setSchool(savedSchool);
-    } else {
-      alert("Incorrect details. Please try again.");
-    }
+  const handleDeleteCategory = (id) => {
+    if (!isSignedIn) return;
+    setCourseProfiles((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const handleLogout = () => {
-    // Remove user data and reset login status in localStorage
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("name");
-    localStorage.removeItem("email");
-    localStorage.removeItem("school");
-    localStorage.removeItem("picture");
-    localStorage.removeItem("calendarEvents");
-    localStorage.removeItem("priorityScores");
-
-    // Reset state variables to reflect logged-out state
-    setName("");
-    setEmail("");
-    setSchool("");
-    setPicture(null);
-    setIsLoggedIn(false); // Set login state to false
-    console.log("Logged out!");
+  const handleUpdateStrength = (id, value) => {
+    if (!isSignedIn) return;
+    setCourseProfiles((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, strength: Number(value) } : c
+      )
+    );
   };
 
-  const handleCreateAccount = (e) => {
-    e.preventDefault();
-
-    // Check if the user already has an account (based on email or name)
-    const savedName = localStorage.getItem("name");
-    const savedEmail = localStorage.getItem("email");
-    const savedSchool = localStorage.getItem("school");
-
-    // Log the current saved info for debugging
-    console.log("Checking if account already exists:", {
-      savedName,
-      savedEmail,
-      savedSchool,
-      loginName,
-      loginEmail,
-      loginSchool
-    });
-
-    // Check if account already exists based on saved localStorage data
-    if (savedName && savedEmail && savedSchool) {
-      alert("Account already exists. Please log in.");
-      return;
-    }
-
-    // Save new account info in localStorage and log the user in
-    localStorage.setItem("name", loginName.trim());
-    localStorage.setItem("email", loginEmail.trim());
-    localStorage.setItem("school", loginSchool.trim());
-    localStorage.setItem("isLoggedIn", "true");
-
-    setIsLoggedIn(true);
-    console.log("Account created successfully! Account info:", { loginName, loginEmail, loginSchool });
-
-    // Automatically log the user in after creating the account
-    setName(loginName.trim());
-    setEmail(loginEmail.trim());
-    setSchool(loginSchool.trim());
+  const handleUpdateNotes = (id, value) => {
+    if (!isSignedIn) return;
+    setCourseProfiles((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, notes: value } : c))
+    );
   };
+
+  if (!isSignedIn) {
+    return (
+      <div className="container">
+        <h1>Learning Profile</h1>
+        <div
+          style={{
+            background: "#ffeeee",
+            padding: "20px",
+            marginBottom: "20px",
+            borderRadius: "8px",
+            textAlign: "center",
+          }}
+        >
+          <h2>🔒 Please sign in with Google</h2>
+          <p>Your general strengths and weaknesses will appear here once you're signed in.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container">
-      <h1>Account</h1>
+      <h1>📊 General Strengths & Weaknesses</h1>
+      <div
+        style={{
+          background: "#e9ffea",
+          padding: "10px",
+          marginBottom: "20px",
+          borderRadius: "5px",
+        }}
+      >
+        <strong>✅ Signed in — You can customize your strengths and weaknesses!</strong>
+      </div>
 
-      {isLoggedIn ? (
-        // If logged in, show account form
-        <div>
-          <form className="account-form" onSubmit={handleSave}>
-            <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="School"
-              value={school}
-              onChange={(e) => setSchool(e.target.value)}
-            />
-            <input
-              type="file"
-              onChange={(e) => setPicture(e.target.files[0])}
-            />
-            <button type="submit" className="save-button">
-              Save
-            </button>
-          </form>
+      <div
+        style={{
+          marginBottom: "20px",
+          padding: "20px",
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+        }}
+      >
+        <h2>Select Your School</h2>
+        <select
+          value={selectedSchool}
+          onChange={handleSchoolChange}
+          style={{ padding: "8px", fontSize: "16px", width: "300px" }}
+        >
+          <option value="">Choose your school...</option>
+          {availableSchools.map((school) => (
+            <option key={school} value={school}>
+              {school}
+            </option>
+          ))}
+        </select>
+      </div>
 
-          <div className="profile-info">
-            <h2>Profile Info</h2>
-            {name && <p>Name: {name}</p>}
-            {email && <p>Email: {email}</p>}
-            {school && <p>School: {school}</p>}
-            {picture && (
-              <img
-                src={picture}
-                alt="Profile"
-                style={{ width: "100px", height: "100px" }}
-              />
-            )}
+      {/* ✅ Changed this: free-text input for category */}
+      <form onSubmit={handleAddCategory} style={{ marginBottom: "20px" }}>
+        <div style={{ display: "flex", gap: "15px", alignItems: "end", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <label htmlFor="categoryName"><strong>Category Name:</strong></label>
+            <input
+              id="categoryName"
+              type="text"
+              placeholder="Enter subject or skill (e.g., Statistics, Art History)"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              style={{ padding: "8px", width: "250px" }}
+              required
+            />
           </div>
 
-          <button className="logout-button" onClick={handleLogout}>
-            Logout
+          <label style={{ display: "flex", alignItems: "center" }}>
+            Strength (0=weak, 10=strong):
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="1"
+              value={newStrength}
+              onChange={(e) => setNewStrength(e.target.value)}
+              style={{ width: "200px", marginLeft: "10px" }}
+            />
+            <span style={{ width: "30px", textAlign: "center", fontWeight: "bold" }}>
+              {newStrength}
+            </span>
+          </label>
+
+          <textarea
+            placeholder="Add notes about this subject"
+            rows={2}
+            value={newNotes}
+            onChange={(e) => setNewNotes(e.target.value)}
+            style={{ width: "300px", padding: "8px" }}
+          />
+
+          <button type="submit" style={{ padding: "10px 20px" }}>
+            Add Category
           </button>
         </div>
-      ) : (
-        // If not logged in, show login or create account form
-        <div>
-          <h2>{createAccountMode ? "Create Account" : "Login"}</h2>
+      </form>
 
-          {createAccountMode ? (
-            <div>
-              <input
-                type="text"
-                placeholder="Name"
-                value={loginName}
-                onChange={(e) => setLoginName(e.target.value)}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="School"
-                value={loginSchool}
-                onChange={(e) => setLoginSchool(e.target.value)}
-              />
-              <button type="button" onClick={handleCreateAccount}>
-                Create Account
-              </button>
-              <p>
-                Already have an account?{" "}
-                <button type="button" onClick={() => setCreateAccountMode(false)}>
-                  Login
+      <div>
+        <h2>Your Strengths ({courseProfiles.length})</h2>
+        {courseProfiles.length === 0 ? (
+          <p>Add your first category above! Ex: Math = 3, Programming = 9, Writing = 6.</p>
+        ) : (
+          courseProfiles.map((profile) => (
+            <div
+              key={profile.id}
+              style={{
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                padding: "20px",
+                marginBottom: "15px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "10px",
+                }}
+              >
+                <h3 style={{ margin: 0 }}>
+                  {profile.category}{" "}
+                  <span style={{ color: "#555" }}>
+                    ({profile.strength}/10)
+                  </span>
+                </h3>
+                <button
+                  onClick={() => handleDeleteCategory(profile.id)}
+                  style={{
+                    background: "#ff4444",
+                    color: "white",
+                    border: "none",
+                    padding: "8px 15px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  Remove
                 </button>
-              </p>
+              </div>
+
+              <label>
+                Strength:
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  value={profile.strength}
+                  onChange={(e) => handleUpdateStrength(profile.id, e.target.value)}
+                  style={{ width: "250px", marginLeft: "10px" }}
+                />
+                <strong style={{ marginLeft: "10px" }}>
+                  {profile.strength}/10
+                </strong>
+              </label>
+
+              <label style={{ display: "block", marginTop: "10px" }}>
+                Notes:
+                <textarea
+                  rows="2"
+                  value={profile.notes}
+                  onChange={(e) => handleUpdateNotes(profile.id, e.target.value)}
+                  style={{ width: "100%", marginTop: "5px", padding: "8px" }}
+                />
+              </label>
             </div>
-          ) : (
-            <div>
-              <input
-                type="text"
-                placeholder="Name"
-                value={loginName}
-                onChange={(e) => setLoginName(e.target.value)}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="School"
-                value={loginSchool}
-                onChange={(e) => setLoginSchool(e.target.value)}
-              />
-              <button type="button" onClick={handleLogin}>
-                Login
-              </button>
-              <p>
-                Don't have an account?{" "}
-                <button type="button" onClick={() => setCreateAccountMode(true)}>
-                  Create Account
-                </button>
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+          ))
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: "30px",
+          padding: "20px",
+          background: "#f0f8ff",
+          borderRadius: "8px",
+          borderLeft: "4px solid #007bff",
+        }}
+      >
+        <h3>💡 How PriorityList Uses This:</h3>
+        <ul>
+          <li>
+            Each subject’s strength auto-fills when you add new tasks in PriorityList.
+          </li>
+          <li>
+            You can override them manually for specific assignments at any time.
+          </li>
+          <li>
+            Your profile saves automatically and syncs with PriorityList.
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }
