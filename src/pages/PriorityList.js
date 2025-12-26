@@ -10,7 +10,6 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
   const [userStrengthWeights, setUserStrengthWeights] = useState([]);
   const [manualOverrides, setManualOverrides] = useState([]);
   const [sortCriteria, setSortCriteria] = useState("recommendedDueDate");
-  const maxDays = 365;
 
   const isValidDate = (dateString) => {
     if (!dateString || dateString === "") return false;
@@ -18,47 +17,43 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
     return date instanceof Date && !isNaN(date.getTime());
   };
 
-const getCourseStrength = (courseTitle) => {
-  if (!courseTitle || courseTitle.trim() === "") return 5;
+  const getCourseStrength = (courseTitle) => {
+    if (!courseTitle || courseTitle.trim() === "") return 5;
 
-  const profiles = JSON.parse(localStorage.getItem("courseProfiles") || "[]");
-  const vocab = JSON.parse(localStorage.getItem("schoolVocab") || "{}");
-  const lowerTitle = courseTitle.toLowerCase().trim();
+    const profiles = JSON.parse(localStorage.getItem("courseProfiles") || "[]");
+    const vocab = JSON.parse(localStorage.getItem("schoolVocab") || "{}");
+    const lowerTitle = courseTitle.toLowerCase().trim();
 
-  console.log("🔍 Matching:", courseTitle);
+    console.log("🔍 Matching:", courseTitle);
 
-  // 1️⃣ Direct Account.js match first
-  const directMatch = profiles.find(p => 
-    p.category && lowerTitle.includes(p.category.toLowerCase().trim())
-  );
-  if (directMatch) {
-    console.log("✅ Direct match:", directMatch.category, "=", directMatch.strength);
-    return directMatch.strength;
-  }
+    // 1️⃣ Direct Account.js match first
+    const directMatch = profiles.find(p => 
+      p.category && lowerTitle.includes(p.category.toLowerCase().trim())
+    );
+    if (directMatch) {
+      console.log("✅ Direct match:", directMatch.category, "=", directMatch.strength);
+      return directMatch.strength;
+    }
 
-  // 2️⃣ School vocab → department → Account match
-  for (const [dept, courses] of Object.entries(vocab)) {
-    if (courses.some(course => 
-      lowerTitle.includes(course.toLowerCase().trim()) ||
-      course.toLowerCase().trim().includes(lowerTitle)
-    )) {
-      const deptMatch = profiles.find(p => 
-        p.category?.toLowerCase().trim() === dept.toLowerCase().trim()
-      );
-      if (deptMatch) {
-        console.log("🏫 Vocab→Account:", dept, "→", deptMatch.strength);
-        return deptMatch.strength;
+    // 2️⃣ School vocab → department → Account match
+    for (const [dept, courses] of Object.entries(vocab)) {
+      if (courses.some(course => 
+        lowerTitle.includes(course.toLowerCase().trim()) ||
+        course.toLowerCase().trim().includes(lowerTitle)
+      )) {
+        const deptMatch = profiles.find(p => 
+          p.category?.toLowerCase().trim() === dept.toLowerCase().trim()
+        );
+        if (deptMatch) {
+          console.log("🏫 Vocab→Account:", dept, "→", deptMatch.strength);
+          return deptMatch.strength;
+        }
       }
     }
-  }
 
-  return 5;
-};
+    return 5;
+  };
 
-
-
-
-  // ✅ MISSING FUNCTION: Add new assignment row
   const addNewAssignment = () => {
     setUserTitles((prev) => [...prev, ""]);
     setUserDueDates((prev) => [...prev, new Date().toISOString().split("T")[0]]);
@@ -66,7 +61,6 @@ const getCourseStrength = (courseTitle) => {
     setManualOverrides((prev) => [...prev, false]);
   };
 
-  // ✅ MISSING FUNCTION: Reset to auto strength
   const resetToAuto = (index) => {
     const overrides = [...manualOverrides];
     overrides[index] = false;
@@ -77,9 +71,29 @@ const getCourseStrength = (courseTitle) => {
     strengths[index] = autoValue;
     setUserStrengthWeights(strengths);
   };
-  
 
-  // ✅ MISSING FUNCTION: Reset all data
+  const deleteRow = (index) => {
+    const title = userTitles[index];
+    const dueDate = userDueDates[index];
+
+    const assignmentId = `${title?.toLowerCase()?.replace(/[^\w\s]/g, "")}_${dueDate}`;
+
+    setUserTitles((prev) => prev.filter((_, i) => i !== index));
+    setUserDueDates((prev) => prev.filter((_, i) => i !== index));
+    setUserStrengthWeights((prev) => prev.filter((_, i) => i !== index));
+    setManualOverrides((prev) => prev.filter((_, i) => i !== index));
+    setPriorityScores((prev) => prev.filter((_, i) => i !== index));
+
+    const token = localStorage.getItem("google_access_token");
+    if (token && priorityEvents) {
+      const eventToDelete = priorityEvents.find((e) => e.assignmentId === assignmentId);
+      if (eventToDelete) {
+        console.log(`🗓️ Removing calendar event for "${title}" on ${dueDate}`);
+        removePriorityEvent(eventToDelete.id);
+      }
+    }
+  };
+
   const resetData = () => {
     setUserTitles([""]);
     setUserDueDates([""]);
@@ -144,35 +158,6 @@ const getCourseStrength = (courseTitle) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userTitles]);
 
-  // ✅ Delete any assignment row
-// ✅ Delete any assignment row + remove related calendar event
-const deleteRow = (index) => {
-  const title = userTitles[index];
-  const dueDate = userDueDates[index];
-
-  // Generate the same assignmentId pattern used in runModelInference
-  const assignmentId = `${title?.toLowerCase()?.replace(/[^\w\s]/g, "")}_${dueDate}`;
-
-  // Remove from React state
-  setUserTitles((prev) => prev.filter((_, i) => i !== index));
-  setUserDueDates((prev) => prev.filter((_, i) => i !== index));
-  setUserStrengthWeights((prev) => prev.filter((_, i) => i !== index));
-  setManualOverrides((prev) => prev.filter((_, i) => i !== index));
-  setPriorityScores((prev) => prev.filter((_, i) => i !== index));
-
-  // 🗑️ Also delete the linked calendar event if it exists
-  const token = localStorage.getItem("google_access_token");
-  if (token && priorityEvents) {
-    const eventToDelete = priorityEvents.find((e) => e.assignmentId === assignmentId);
-    if (eventToDelete) {
-      console.log(`🗓️ Removing calendar event for "${title}" on ${dueDate}`);
-      removePriorityEvent(eventToDelete.id);
-    }
-  }
-};
-
-
-
   // ✅ Sync override array length
   useEffect(() => {
     if (manualOverrides.length !== userTitles.length) {
@@ -185,7 +170,7 @@ const deleteRow = (index) => {
     }
   }, [userTitles.length, manualOverrides.length]);
 
- // ✅ DYNAMIC SCHOOL VOCAB - Matches Account.js selected school
+  // ✅ DYNAMIC SCHOOL VOCAB - Matches Account.js selected school
   useEffect(() => {
     const loadDynamicVocab = () => {
       const school = localStorage.getItem("selectedSchool") || "ucsd";
@@ -218,7 +203,6 @@ const deleteRow = (index) => {
     };
 
     loadDynamicVocab();
-    // Reload when school changes
     const schoolInterval = setInterval(loadDynamicVocab, 2000);
     return () => clearInterval(schoolInterval);
   }, []);
@@ -234,7 +218,6 @@ const deleteRow = (index) => {
     localStorage.setItem("priorityScores", JSON.stringify(priorityScores));
   }, [userTitles, userDueDates, userStrengthWeights, manualOverrides, priorityScores]);
 
-  // ✅ Model inference
   const runModelInference = async () => {
     const token = localStorage.getItem("google_access_token");
     if (!token) {
@@ -295,6 +278,7 @@ const deleteRow = (index) => {
     }
   };
 
+  // ✅ FIXED: Matches PyTorch training normalization exactly
   const preprocessData = (titles, dates, weights) => {
     const indexMap = Object.keys(courseVocab).reduce((acc, cat, i) => {
       acc[cat.toLowerCase()] = i;
@@ -313,15 +297,30 @@ const deleteRow = (index) => {
       return idx !== -1 ? idx : 0;
     });
 
+    // ✅ DYNAMIC MAX NORMALIZATION (matches training: due_days /= max_days)
+    let maxDueDays = 0;
+    dates.forEach((d) => {
+      if (isValidDate(d)) {
+        const today = new Date();
+        const dd = new Date(d);
+        const diff = Math.ceil((dd - today) / (1000 * 3600 * 24));
+        if (diff > maxDueDays) maxDueDays = diff;
+      }
+    });
+
     const dueNormalized = dates.map((d) => {
       if (!isValidDate(d)) return 0;
       const today = new Date();
       const dd = new Date(d);
       const diff = Math.ceil((dd - today) / (1000 * 3600 * 24));
-      return Math.max(0, diff / maxDays);
+      return Math.max(0, diff / (maxDueDays || 30)); // Fallback to 30 days
     });
 
-    const weightNorm = weights.map((w) => (w || 0) / 10);
+    // ✅ RAW STRENGTH WEIGHTS (matches training: no /10 normalization)
+    const weightNorm = weights.map((w) => w || 0);
+
+    console.log("📊 Preprocessing:", { titleIndices: titleIndices.slice(0, 3), dueNormalized: dueNormalized.slice(0, 3), weightNorm: weightNorm.slice(0, 3), maxDueDays });
+    
     return { titleIndices, dueDates: dueNormalized, strengthWeights: weightNorm };
   };
 
@@ -337,7 +336,6 @@ const deleteRow = (index) => {
     return recommended.toISOString().split("T")[0];
   };
 
-  // ✅ Sorting logic
   const sortData = (data) => {
     switch (sortCriteria) {
       case "priority":
@@ -394,7 +392,6 @@ const deleteRow = (index) => {
         </div>
       )}
 
-      {/* ✅ Sorting dropdown */}
       <div style={{ marginBottom: "20px" }}>
         <h3>🔃 Sort By:</h3>
         <select
@@ -485,31 +482,27 @@ const deleteRow = (index) => {
                       🔄 Auto
                     </button>
                   )}
-                  {/* ✅ NEW DELETE BUTTON */}
-        {isLoggedIn && (
-          <button
-            type="button"
-            onClick={() => deleteRow(i)}
-            style={{
-              fontSize: 12,
-              background: "#ff4444",
-              color: "white",
-              border: "none",
-              borderRadius: 3,
-              padding: "4px 8px",
-              cursor: "pointer"
-            }}
-          >
-            ❌ Delete
-          </button>
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
-
-
-              
+                  {isLoggedIn && (
+                    <button
+                      type="button"
+                      onClick={() => deleteRow(i)}
+                      style={{
+                        fontSize: 12,
+                        background: "#ff4444",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 3,
+                        padding: "4px 8px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ❌ Delete
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
 
         <div style={{ margin: "20px 0" }}>
