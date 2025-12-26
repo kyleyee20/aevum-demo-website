@@ -94,15 +94,32 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
     }
   };
 
+  // ✅ FIXED: Reset all + clear calendar events
   const resetData = () => {
+    // Clear React state
     setUserTitles([""]);
     setUserDueDates([""]);
     setUserStrengthWeights([0]);
     setManualOverrides([false]);
     setPriorityScores([]);
+
+    // Clear localStorage
     ["userTitles", "userDueDates", "userStrengthWeights", "manualOverrides", "priorityScores"].forEach(
       (key) => localStorage.removeItem(key)
     );
+
+    // 🗓️ Remove all priority calendar events
+    const token = localStorage.getItem("google_access_token");
+    if (token && priorityEvents && Array.isArray(priorityEvents)) {
+      priorityEvents.forEach((event) => {
+        if (event.isPriority) {
+          console.log(`🗓️ Removing priority event "${event.title}"`);
+          removePriorityEvent(event.id);
+        }
+      });
+    }
+
+    console.log("🧹 Reset complete: assignments and calendar events removed.");
   };
 
   // ✅ Restore data + token check
