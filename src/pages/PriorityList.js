@@ -77,6 +77,7 @@ const getCourseStrength = (courseTitle) => {
     strengths[index] = autoValue;
     setUserStrengthWeights(strengths);
   };
+  
 
   // ✅ MISSING FUNCTION: Reset all data
   const resetData = () => {
@@ -143,6 +144,35 @@ const getCourseStrength = (courseTitle) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userTitles]);
 
+  // ✅ Delete any assignment row
+// ✅ Delete any assignment row + remove related calendar event
+const deleteRow = (index) => {
+  const title = userTitles[index];
+  const dueDate = userDueDates[index];
+
+  // Generate the same assignmentId pattern used in runModelInference
+  const assignmentId = `${title?.toLowerCase()?.replace(/[^\w\s]/g, "")}_${dueDate}`;
+
+  // Remove from React state
+  setUserTitles((prev) => prev.filter((_, i) => i !== index));
+  setUserDueDates((prev) => prev.filter((_, i) => i !== index));
+  setUserStrengthWeights((prev) => prev.filter((_, i) => i !== index));
+  setManualOverrides((prev) => prev.filter((_, i) => i !== index));
+  setPriorityScores((prev) => prev.filter((_, i) => i !== index));
+
+  // 🗑️ Also delete the linked calendar event if it exists
+  const token = localStorage.getItem("google_access_token");
+  if (token && priorityEvents) {
+    const eventToDelete = priorityEvents.find((e) => e.assignmentId === assignmentId);
+    if (eventToDelete) {
+      console.log(`🗓️ Removing calendar event for "${title}" on ${dueDate}`);
+      removePriorityEvent(eventToDelete.id);
+    }
+  }
+};
+
+
+
   // ✅ Sync override array length
   useEffect(() => {
     if (manualOverrides.length !== userTitles.length) {
@@ -155,25 +185,42 @@ const getCourseStrength = (courseTitle) => {
     }
   }, [userTitles.length, manualOverrides.length]);
 
-  // ✅ Load course vocab
+ // ✅ DYNAMIC SCHOOL VOCAB - Matches Account.js selected school
   useEffect(() => {
-    fetch("/ucsd_courses.json")
-      .then((res) => res.json())
-      .then((data) => {
-        const vocab = {};
-        let current = null;
-        data.forEach((item) => {
-          const category = item["Table 1"];
-          const course = item["Unnamed: 1"];
-          if (category && category.trim()) current = category.trim();
-          if (course && course.trim()) {
-            if (!vocab[current]) vocab[current] = [];
-            vocab[current].push(course.trim());
-          }
+    const loadDynamicVocab = () => {
+      const school = localStorage.getItem("selectedSchool") || "ucsd";
+      console.log(`📚 Loading ${school.toUpperCase()} courses...`);
+      
+      fetch(`/schools/${school}_courses.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`No ${school} courses found`);
+          return res.json();
+        })
+        .then((data) => {
+          const vocab = {};
+          let current = null;
+          data.forEach((item) => {
+            const category = item["Table 1"];
+            const course = item["Unnamed: 1"];
+            if (category && category.trim()) current = category.trim();
+            if (course && course.trim()) {
+              if (!vocab[current]) vocab[current] = [];
+              vocab[current].push(course.trim());
+            }
+          });
+          setCourseVocab(vocab);
+          console.log(`✅ ${school.toUpperCase()} vocab loaded:`, Object.keys(vocab).length, "departments");
+        })
+        .catch((err) => {
+          console.error("❌ Course vocab failed:", err);
+          setCourseVocab({});
         });
-        setCourseVocab(vocab);
-      })
-      .catch((err) => console.error("Error loading course vocab:", err));
+    };
+
+    loadDynamicVocab();
+    // Reload when school changes
+    const schoolInterval = setInterval(loadDynamicVocab, 2000);
+    return () => clearInterval(schoolInterval);
   }, []);
 
   // ✅ Save to localStorage
@@ -438,10 +485,31 @@ const getCourseStrength = (courseTitle) => {
                       🔄 Auto
                     </button>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
+                  {/* ✅ NEW DELETE BUTTON */}
+        {isLoggedIn && (
+          <button
+            type="button"
+            onClick={() => deleteRow(i)}
+            style={{
+              fontSize: 12,
+              background: "#ff4444",
+              color: "white",
+              border: "none",
+              borderRadius: 3,
+              padding: "4px 8px",
+              cursor: "pointer"
+            }}
+          >
+            ❌ Delete
+          </button>
+        )}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
+
+              
         </table>
 
         <div style={{ margin: "20px 0" }}>
