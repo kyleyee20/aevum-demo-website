@@ -10,6 +10,10 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
   const [userStrengthWeights, setUserStrengthWeights] = useState([]);
   const [manualOverrides, setManualOverrides] = useState([]);
   const [sortCriteria, setSortCriteria] = useState("recommendedDueDate");
+  const [completedAssignments, setCompletedAssignments] = useState(
+  JSON.parse(localStorage.getItem("completedAssignments") || "[]")
+  
+);
 
   const isValidDate = (dateString) => {
     if (!dateString || dateString === "") return false;
@@ -93,34 +97,74 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
       }
     }
   };
-
-  // ✅ FIXED: Reset all + clear calendar events
-  const resetData = () => {
-    // Clear React state
-    setUserTitles([""]);
-    setUserDueDates([""]);
-    setUserStrengthWeights([0]);
-    setManualOverrides([false]);
-    setPriorityScores([]);
-
-    // Clear localStorage
-    ["userTitles", "userDueDates", "userStrengthWeights", "manualOverrides", "priorityScores"].forEach(
-      (key) => localStorage.removeItem(key)
-    );
-
-    // 🗓️ Remove all priority calendar events
-    const token = localStorage.getItem("google_access_token");
-    if (token && priorityEvents && Array.isArray(priorityEvents)) {
-      priorityEvents.forEach((event) => {
-        if (event.isPriority) {
-          console.log(`🗓️ Removing priority event "${event.title}"`);
-          removePriorityEvent(event.id);
-        }
-      });
-    }
-
-    console.log("🧹 Reset complete: assignments and calendar events removed.");
+  const handleComplete = (index) => {
+  const completed = {
+    title: userTitles[index],
+    dueDate: userDueDates[index],
+    priority: priorityScores[index] || 0,
+    recommendedDueDate: getRecommendedDueDate(priorityScores[index], userDueDates[index]),
+    completedAt: new Date().toISOString().split("T")[0],
   };
+
+  setCompletedAssignments((prev) => [...prev, completed]);
+  deleteRow(index);  // ✅ Reuses your existing delete logic
+
+  localStorage.setItem(
+    "completedAssignments",
+    JSON.stringify([...completedAssignments, completed])
+  );
+};
+
+const handleUndo = (index) => {
+  const restored = completedAssignments[index];
+
+  // 🧱 Re-add the assignment back to active lists
+  setUserTitles((prev) => [...prev, restored.title]);
+  setUserDueDates((prev) => [...prev, restored.dueDate]);
+  setUserStrengthWeights((prev) => [...prev, 5]); // Default confidence
+  setManualOverrides((prev) => [...prev, false]);
+  setPriorityScores((prev) => [...prev, restored.priority]);
+
+  // 🧹 Remove it from completed
+  const updated = completedAssignments.filter((_, i) => i !== index);
+  setCompletedAssignments(updated);
+  localStorage.setItem("completedAssignments", JSON.stringify(updated));
+
+  console.log(`↩ Undid "${restored.title}" — restored to active list.`);
+};
+
+
+ const resetData = () => {
+  // Clear React state
+  setUserTitles([""]);
+  setUserDueDates([""]);
+  setUserStrengthWeights([0]);
+  setManualOverrides([false]);
+  setPriorityScores([]);
+
+  // Clear localStorage for assignments
+  ["userTitles", "userDueDates", "userStrengthWeights", "manualOverrides", "priorityScores"].forEach(
+    (key) => localStorage.removeItem(key)
+  );
+
+  // 🗑️ CRITICAL: Remove ALL priority events from localStorage.calendarEvents too
+  const storedEvents = JSON.parse(localStorage.getItem("calendarEvents") || "[]");
+  const nonPriorityEvents = storedEvents.filter((event) => !event.isPriority);
+  localStorage.setItem("calendarEvents", JSON.stringify(nonPriorityEvents));
+  console.log(`🧹 Removed ${storedEvents.length - nonPriorityEvents.length} priority events from localStorage`);
+
+  // 🗓️ Remove from live calendar state
+  if (priorityEvents && Array.isArray(priorityEvents)) {
+    priorityEvents.forEach((event) => {
+      if (event.isPriority) {
+        console.log(`🗓️ Removing priority event "${event.title}"`);
+        removePriorityEvent(event.id);
+      }
+    });
+  }
+
+  console.log("🧹 Reset complete: assignments + calendar events + localStorage cleaned.");
+};
 
   // ✅ Restore data + token check
   useEffect(() => {
@@ -158,11 +202,15 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
         setManualOverrides([false]);
       }
     };
+      
 
     checkTokenAndLoad();
     const timer = setInterval(checkTokenAndLoad, 1000);
     return () => clearInterval(timer);
   }, []);
+  // ✅ ADD THIS NEW useEffect - Auto-process Google Calendar matches
+  
+
 
   // ✅ Auto-fill strengths from Account
   useEffect(() => {
@@ -266,25 +314,52 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
       setPriorityScores(validScores);
 
       validScores.forEach((score, idx) => {
-        if (userTitles[idx] && userDueDates[idx] && isValidDate(userDueDates[idx])) {
-          const assignmentId = `${userTitles[idx].toLowerCase().replace(/[^\w\s]/g, "")}_${userDueDates[idx]}`;
-          const eventTitle = `${userTitles[idx]} (Priority: ${score.toFixed(2)})`;
-          
-          const oldEvent = priorityEvents?.find((e) => e.assignmentId === assignmentId);
-          if (oldEvent) removePriorityEvent(oldEvent.id);
+  if (userTitles[idx] && isValidDate(userDueDates[idx])) {
+    const assignmentId = `${userTitles[idx].toLowerCase().replace(/[^\w\s]/g, "")}_${userDueDates[idx]}`;
+    
+    // 🗑️ Remove Google/manual duplicates (looser matching)
+    const cleanCurrent = userTitles[idx].toLowerCase().replace(/[^\w\s]/g, "").trim();
+    const eventDate = new Date(userDueDates[idx]).toISOString().split("T")[0];
 
-          const event = {
-            id: `priority_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`,
-            assignmentId,
-            title: eventTitle,
-            start: new Date(userDueDates[idx]),
-            end: new Date(userDueDates[idx]),
-            priority: score,
-            confidenceWeight: userStrengthWeights[idx],
-            allDay: true,
-            isPriority: true,
-          };
-          addPriorityEvent(event);
+    const duplicates = priorityEvents?.filter((e) => {
+      if (e.isPriority) return false;
+      const cleanExisting = e.title.toLowerCase().replace(/[^\w\s]/g, "").trim();
+      const titleMatch = 
+        cleanExisting.includes(cleanCurrent) ||
+        cleanCurrent.includes(cleanExisting) ||
+        cleanExisting.split(' ').some(word => cleanCurrent.includes(word));
+      const dateMatch = new Date(e.start).toISOString().split("T")[0] === eventDate;
+      
+      return titleMatch && dateMatch;
+    });
+    
+    duplicates?.forEach((dup) => {
+      console.log(`🗑️ Removing Google duplicate "${dup.title}"`);
+      removePriorityEvent(dup.id);
+    });
+
+    // Remove old priority version
+    const oldPriority = priorityEvents?.find((e) => e.assignmentId === assignmentId);
+    if (oldPriority) removePriorityEvent(oldPriority.id);
+
+    // Add new priority event
+    const event = {
+      id: `priority_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`,
+      assignmentId,
+      title: `${userTitles[idx]} (Priority: ${score.toFixed(2)})`,
+      start: new Date(userDueDates[idx]),
+      end: new Date(userDueDates[idx]),
+      priority: score,
+      confidenceWeight: userStrengthWeights[idx],
+      allDay: true,
+      isPriority: true,
+    };
+    addPriorityEvent(event);
+    console.log(`✅ Added "${event.title}"`);
+    
+
+
+
         }
       });
     } catch (err) {
@@ -340,18 +415,33 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
     
     return { titleIndices, dueDates: dueNormalized, strengthWeights: weightNorm };
   };
-
-  const getRecommendedDueDate = (priority, dueDate) => {
+    const getRecommendedDueDate = (priority, dueDate) => {
     if (!isValidDate(dueDate)) return "Invalid Date";
+
     const today = new Date();
     const dueDateObj = new Date(dueDate);
-    const adjustment = Math.max(0, (1 - priority) * 7);
+
+    // 🧮 How many days until the assignment is due
+    const diffDays = Math.ceil((dueDateObj - today) / (1000 * 3600 * 24));
+
+    // 📊 Dynamic scaling: farther deadlines allow a larger early adjustment
+    // At most 30% of total time until due, capped at 14 days earlier
+    const maxAdjustment = Math.min(14, diffDays * 0.3);
+
+    // 🎯 Higher priority = earlier shift
+    const adjustment = Math.max(0, priority * maxAdjustment);
+
     const recommended = new Date(dueDateObj);
     recommended.setDate(dueDateObj.getDate() - adjustment);
+
+    // 🛡 Ensure the recommended date never goes beyond valid limits
     if (recommended < today) recommended.setTime(today.getTime());
     if (recommended > dueDateObj) recommended.setTime(dueDateObj.getTime());
+
     return recommended.toISOString().split("T")[0];
   };
+
+
 
   const sortData = (data) => {
     switch (sortCriteria) {
@@ -500,6 +590,25 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
                     </button>
                   )}
                   {isLoggedIn && (
+  <button
+    type="button"
+    onClick={() => handleComplete(i)}
+    style={{
+      fontSize: 12,
+      background: "#28a745",
+      color: "white",
+      border: "none",
+      borderRadius: 3,
+      padding: "4px 8px",
+      cursor: "pointer",
+      marginRight: "4px"  // Small spacing
+    }}
+  >
+    ✔ Done
+  </button>
+)}
+
+                  {isLoggedIn && (
                     <button
                       type="button"
                       onClick={() => deleteRow(i)}
@@ -535,7 +644,7 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
         </div>
       </form>
 
-      {priorityScores.length > 0 && !loading && (
+       {priorityScores.length > 0 && !loading && (
         <div>
           <h2>
             Predicted Priority List —{" "}
@@ -561,6 +670,49 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
               ))}
             </tbody>
           </table>
+
+          {/* ✅ Completed Assignments Table */}
+          {completedAssignments.length > 0 && (
+            <div style={{ marginTop: 40 }}>
+              <h2>✅ Completed Assignments</h2>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Course Title</th>
+                    <th>Due Date</th>
+                    <th>Priority Score</th>
+                    <th>Recommended Due</th>
+                    <th>Completed On</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {completedAssignments.map((item, i) => (
+                    <tr key={i}>
+                      <td>{item.title}</td>
+                      <td>{item.dueDate}</td>
+                      <td>{item.priority.toFixed(3)}</td>
+                      <td>{item.recommendedDueDate}</td>
+                      <td>{item.completedAt}</td>
+                      <button
+  onClick={() => handleUndo(i)}
+  style={{
+    background: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: 3,
+    padding: "4px 8px",
+    cursor: "pointer",
+  }}
+>
+  ↩ Undo
+</button>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
