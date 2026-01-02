@@ -8,7 +8,7 @@ const localizer = momentLocalizer(moment);
 
 export default function Home({ calendarEvents }) {
   const [events, setEvents] = useState([]);
-
+const [newPriorityFromGoogle, setNewPriorityFromGoogle] = useState(0); // 👈 ADD HERE
   // 🧠 Pull strength values directly from Account.js profiles + vocab
   const getCourseStrength = (courseTitle) => {
     if (!courseTitle || courseTitle.trim() === "") return 5;
@@ -66,48 +66,73 @@ export default function Home({ calendarEvents }) {
     const normalize = (text) =>
       text ? text.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
 
-    const formattedCalendarEvents = calendarEvents.map((event) => {
-      // AI/Priority events stay untouched
-      if (event.isPriority || event.title) {
-        return {
-          id: event.id,
-          title: event.title || "Priority Event",
-          start: new Date(event.start),
-          end: new Date(event.end),
-          allDay: event.allDay || false,
-        };
-      } else {
-        const title = event.summary || "No title";
-        const start = new Date(event.start.dateTime || event.start.date);
-        const end = new Date(event.end.dateTime || event.end.date);
-        const cleanTitle = normalize(title);
+  const formattedCalendarEvents = calendarEvents.map((event) => {
+  // AI/Priority events stay untouched
+  if (event.isPriority || event.title) {
+    return event.isPriority ? {
+      id: event.id,
+      title: event.title || "Priority Event",
+      start: new Date(event.start),
+      end: new Date(event.end),
+      allDay: event.allDay || false,
+    } : null; // Skip non-priority Google events
+  } else {
+    const title = event.summary || "No title";
+    const start = new Date(event.start.dateTime || event.start.date);
 
-        // ---- Match against vocab
-        const matchCategory = Object.entries(vocab).find(([dept, courses]) =>
-          courses.some((course) => {
-            const cleanCourse = normalize(course);
-            const match =
-              cleanTitle.includes(cleanCourse) ||
-              cleanCourse.includes(cleanTitle);
-            if (match) {
-              console.log(`✅ Match found: "${title}" ↔ "${course}" (in ${dept})`);
-            }
-            return match;
-          })
-        );
 
-        if (matchCategory) {
-          priorityEligible.push({
-            title,
-            dueDate: start.toISOString().split("T")[0],
-          });
-        } else {
-          console.log(`🚫 No match for: ${title}`);
+    // ---- EXTRACT COURSE CODE from title (e.g. "PHYS 2A", "MATH 4C")
+    const extractCourseCode = (text) => {
+      const codeMatch = text.match(/([a-zA-Z]{3,5})\s+([0-9]+[a-zA-Z]?)/i);
+      if (!codeMatch) return null;
+      
+      const rawDept = codeMatch[1];
+      const rawNum = codeMatch[2];
+      const dept = normalize(rawDept);  // "math" → "math"
+      const num = rawNum.toUpperCase(); // Keep number case-consistent: "4c" → "4C"
+      
+      return { dept, num };
+    };
+
+    const titleCourseCode = extractCourseCode(title);
+
+    const matchCategory = Object.entries(vocab).find(([dept, courses]) =>
+      courses.some((course) => {
+        const courseCode = extractCourseCode(course);
+        if (!courseCode || !titleCourseCode) return false;
+        
+        const match = titleCourseCode.dept === courseCode.dept && 
+                      titleCourseCode.num === courseCode.num;
+
+        if (match) {
+          console.log(`✅ EXACT COURSE CODE MATCH: "${title}" (${JSON.stringify(titleCourseCode)}) ↔ "${course}" (${JSON.stringify(courseCode)}) in ${dept}`);
         }
+        return match;
+      })
+    );
 
-        return { id: event.id, title, start, end };
+    if (matchCategory) {
+      const today = new Date().toISOString().split("T")[0];
+      const eventDate = start.toISOString().split("T")[0];
+      
+      if (eventDate >= today) {
+        priorityEligible.push({
+          title,
+          dueDate: eventDate,
+        });
+        console.log(`✅ Future COURSE match: "${title}" → PriorityList`);
+      } else {
+        console.log(`⏰ Past due - skipping: "${title}"`);
       }
-    });
+    } else {
+      console.log(`🚫 No COURSE CODE match for: ${title} (${titleCourseCode || 'none'})`);
+    }
+
+    // DON'T RETURN Google events - scan only
+    return null;
+  }
+});
+
 
     // ---- Directly insert matched courses into PriorityList’s storage
     if (priorityEligible.length > 0) {
@@ -136,6 +161,8 @@ export default function Home({ calendarEvents }) {
           newWeights.push(strength);
           newOverrides.push(false);
           console.log(`📘 Added "${title}" (${strength}) to manual storage`);
+           // 👈 ADD THIS LINE HERE:
+    setNewPriorityFromGoogle(prev => prev + 1);
         }
       });
 
@@ -151,17 +178,48 @@ export default function Home({ calendarEvents }) {
     }
 
     // ---- Combine events for calendar rendering
-    const allEvents = [...formattedLocalStorageEvents, ...formattedCalendarEvents];
+const allEvents = [...formattedLocalStorageEvents, ...formattedCalendarEvents.filter(Boolean)];
     setEvents(allEvents);
 
     console.log("📅 Raw calendarEvents from App:", calendarEvents);
     console.log("Formatted events count:", allEvents.length);
     console.log("First few events:", allEvents.slice(0, 3));
   }, [calendarEvents]);
+  // 👈 ADD THIS NEW useEffect HERE:
+useEffect(() => {
+  const timer = setTimeout(() => setNewPriorityFromGoogle(0), 100);
+  return () => clearTimeout(timer);
+}, []);
 
   return (
     <div className="container" style={{ height: "80vh" }}>
       <h1>Welcome to Aevumm</h1>
+      {newPriorityFromGoogle > 0 && (
+  <div style={{
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    padding: '15px 25px',
+    borderRadius: '12px',
+    margin: '15px 0',
+    textAlign: 'center',
+    fontSize: '16px',
+    fontWeight: '600',
+    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
+    border: '2px solid rgba(255,255,255,0.2)'
+  }}>
+    📚 <strong>{newPriorityFromGoogle} new course event(s)</strong> detected from Google Calendar 
+    and added to Priority List! 
+    <Link to="/priority" style={{ 
+      color: '#FFD700', 
+      marginLeft: '15px', 
+      textDecoration: 'none', 
+      fontWeight: 'bold' 
+    }}>
+      Review Now →
+    </Link>
+  </div>
+)}
+
 
       <Calendar
         localizer={localizer}

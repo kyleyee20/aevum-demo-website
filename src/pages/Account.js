@@ -199,7 +199,7 @@ export default function Account() {
           </div>
 
           <label style={{ display: "flex", alignItems: "center" }}>
-            Strength (0=strong, 10=weak):
+            Strength (0=weak, 10=strong):
             <input
               type="range"
               min="0"

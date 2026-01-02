@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react"; // 👈 Add useCallback
 import * as ort from "onnxruntime-web";
 
 export default function PriorityList({ priorityEvents, addPriorityEvent, removePriorityEvent }) {
@@ -76,35 +76,67 @@ export default function PriorityList({ priorityEvents, addPriorityEvent, removeP
     setUserStrengthWeights(strengths);
   };
 
-  const deleteRow = (index) => {
-    const title = userTitles[index];
-    const dueDate = userDueDates[index];
+  const deleteRow = useCallback((index) => {
+  const title = userTitles[index];
+  const dueDate = userDueDates[index];
+  const assignmentId = `${title?.toLowerCase()?.replace(/[^\w\s]/g, "")}_${dueDate}`;
 
-    const assignmentId = `${title?.toLowerCase()?.replace(/[^\w\s]/g, "")}_${dueDate}`;
+  // 🆕 NEW: Delete from localStorage FIRST
+  const savedTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
+  const savedDueDates = JSON.parse(localStorage.getItem("userDueDates") || "[]");
+  const savedStrengths = JSON.parse(localStorage.getItem("userStrengthWeights") || "[]");
+  const savedOverrides = JSON.parse(localStorage.getItem("manualOverrides") || "[]");
+  const savedScores = JSON.parse(localStorage.getItem("priorityScores") || "[]");
 
-    setUserTitles((prev) => prev.filter((_, i) => i !== index));
-    setUserDueDates((prev) => prev.filter((_, i) => i !== index));
-    setUserStrengthWeights((prev) => prev.filter((_, i) => i !== index));
-    setManualOverrides((prev) => prev.filter((_, i) => i !== index));
-    setPriorityScores((prev) => prev.filter((_, i) => i !== index));
+  const newTitles = savedTitles.filter((_, i) => i !== index);
+  const newDueDates = savedDueDates.filter((_, i) => i !== index);
+  const newStrengths = savedStrengths.filter((_, i) => i !== index);
+  const newOverrides = savedOverrides.filter((_, i) => i !== index);
+  const newScores = savedScores.filter((_, i) => i !== index);
 
-    const token = localStorage.getItem("google_access_token");
-    if (token && priorityEvents) {
-      const eventToDelete = priorityEvents.find((e) => e.assignmentId === assignmentId);
-      if (eventToDelete) {
-        console.log(`🗓️ Removing calendar event for "${title}" on ${dueDate}`);
-        removePriorityEvent(eventToDelete.id);
-      }
+  // 💾 Permanently save deletions to localStorage
+  localStorage.setItem("userTitles", JSON.stringify(newTitles));
+  localStorage.setItem("userDueDates", JSON.stringify(newDueDates));
+  localStorage.setItem("userStrengthWeights", JSON.stringify(newStrengths));
+  localStorage.setItem("manualOverrides", JSON.stringify(newOverrides));
+  localStorage.setItem("priorityScores", JSON.stringify(newScores));
+
+  // Update React state LAST (your existing logic)
+  setUserTitles(newTitles);
+  setUserDueDates(newDueDates);
+  setUserStrengthWeights(newStrengths);
+  setManualOverrides(newOverrides);
+  setPriorityScores(newScores);
+
+  // Remove from calendar (your existing logic)
+  const token = localStorage.getItem("google_access_token");
+  if (token && priorityEvents) {
+    const eventToDelete = priorityEvents.find((e) => e.assignmentId === assignmentId);
+    if (eventToDelete) {
+      console.log(`🗓️ Removing calendar event for "${title}" on ${dueDate}`);
+      removePriorityEvent(eventToDelete.id);
     }
-  };
-  const handleComplete = (index) => {
+  }
+}, [userTitles, userDueDates, priorityEvents, removePriorityEvent]);
+
+const handleComplete = (index) => {
   const completed = {
     title: userTitles[index],
     dueDate: userDueDates[index],
     priority: priorityScores[index] || 0,
-    recommendedDueDate: getRecommendedDueDate(priorityScores[index], userDueDates[index]),
+    recommendedDueDate: getRecommendedDueDate(priorityScores[index], userDueDates[index], userStrengthWeights[index]),
     completedAt: new Date().toISOString().split("T")[0],
   };
+
+  // 👈 IMMEDIATELY update localStorage FIRST
+  const updatedCompleted = [...completedAssignments, completed];
+  localStorage.setItem("completedAssignments", JSON.stringify(updatedCompleted));
+  setCompletedAssignments(updatedCompleted);
+
+  // THEN delete from active lists
+  deleteRow(index);
+
+
 
   setCompletedAssignments((prev) => [...prev, completed]);
   deleteRow(index);  // ✅ Reuses your existing delete logic
@@ -166,6 +198,32 @@ const handleUndo = (index) => {
   console.log("🧹 Reset complete: assignments + calendar events + localStorage cleaned.");
 };
 
+// 🔔 PAST-DUE CLEANUP: Remove overdue assignments
+useEffect(() => {
+  const cleanPastDue = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const savedTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
+    
+    // Find overdue indices
+    const overdueIndices = savedTitles.map((title, i) => {
+      const dueDate = JSON.parse(localStorage.getItem("userDueDates") || "[]")[i];
+      return isValidDate(dueDate) && dueDate < today ? i : -1;
+    }).filter(i => i !== -1);
+    
+    if (overdueIndices.length > 0) {
+      console.log(`🔔 Found ${overdueIndices.length} past-due assignments - auto-deleting`);
+      
+      // Delete them using your existing logic
+      overdueIndices.forEach(index => deleteRow(index));
+    }
+  };
+  
+  cleanPastDue();
+  const interval = setInterval(cleanPastDue, 10 * 60 * 1000); // Every 10 minutes
+  return () => clearInterval(interval);
+}, [deleteRow]); // Depend on deleteRow so it has access
+
+
   // ✅ Restore data + token check
   useEffect(() => {
     const checkTokenAndLoad = () => {
@@ -179,28 +237,45 @@ const handleUndo = (index) => {
         return;
       }
 
-      const savedTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
-      const savedDueDates = JSON.parse(localStorage.getItem("userDueDates") || "[]");
-      const savedStrengths = JSON.parse(localStorage.getItem("userStrengthWeights") || "[]");
-      const savedOverrides = JSON.parse(localStorage.getItem("manualOverrides") || "[]");
-      const savedScores = JSON.parse(localStorage.getItem("priorityScores") || "[]");
+const completedAssignments = JSON.parse(localStorage.getItem("completedAssignments") || "[]");
+    
+    const savedTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
+    const savedDueDates = JSON.parse(localStorage.getItem("userDueDates") || "[]");
+    const savedStrengths = JSON.parse(localStorage.getItem("userStrengthWeights") || "[]");
+    const savedOverrides = JSON.parse(localStorage.getItem("manualOverrides") || "[]");
+    const savedScores = JSON.parse(localStorage.getItem("priorityScores") || "[]");
 
-      if (savedTitles.length > 0 && savedDueDates.length > 0 && savedStrengths.length > 0) {
-        setUserTitles(savedTitles);
-        setUserDueDates(savedDueDates);
-        setUserStrengthWeights(savedStrengths);
-        setManualOverrides(
-          savedOverrides.length === savedTitles.length
-            ? savedOverrides
-            : Array(savedTitles.length).fill(false)
-        );
-        setPriorityScores(savedScores);
-      } else {
-        setUserTitles([""]);
-        setUserDueDates([""]);
-        setUserStrengthWeights([0]);
-        setManualOverrides([false]);
-      }
+    // 🆕 NEW: Filter out completed assignments
+    const isCompleted = (t, d) =>
+      completedAssignments.some(
+        (c) =>
+          c.title?.toLowerCase().trim() === t?.toLowerCase().trim() &&
+          c.dueDate === d
+      );
+
+    const filteredTitles = savedTitles.filter((t, i) => !isCompleted(t, savedDueDates[i]));
+    const filteredDueDates = savedDueDates.filter((d, i) => !isCompleted(savedTitles[i], d));
+    const filteredStrengths = savedStrengths.filter((_, i) => !isCompleted(savedTitles[i], savedDueDates[i]));
+    const filteredOverrides = savedOverrides.filter((_, i) => !isCompleted(savedTitles[i], savedDueDates[i]));
+    const filteredScores = savedScores.filter((_, i) => !isCompleted(savedTitles[i], savedDueDates[i]));
+
+    // 🆕 Use filtered data instead
+    if (filteredTitles.length > 0) {
+      setUserTitles(filteredTitles);
+      setUserDueDates(filteredDueDates);
+      setUserStrengthWeights(filteredStrengths);
+      setManualOverrides(
+        filteredOverrides.length === filteredTitles.length
+          ? filteredOverrides
+          : Array(filteredTitles.length).fill(false)
+      );
+      setPriorityScores(filteredScores);
+    } else {
+      setUserTitles([""]);
+      setUserDueDates([""]);
+      setUserStrengthWeights([0]);
+      setManualOverrides([false]);
+    }
     };
       
 
@@ -271,6 +346,31 @@ const handleUndo = (index) => {
     const schoolInterval = setInterval(loadDynamicVocab, 2000);
     return () => clearInterval(schoolInterval);
   }, []);
+
+  // 🧹 AUTO-CLEAN: Remove completed assignments > 30 days old
+useEffect(() => {
+  const cleanOldCompleted = () => {
+    const completed = JSON.parse(localStorage.getItem("completedAssignments") || "[]");
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentCompleted = completed.filter((item) => {
+      const completedDate = new Date(item.completedAt);
+      return completedDate > thirtyDaysAgo;
+    });
+    
+    if (recentCompleted.length < completed.length) {
+      console.log(`🧹 Cleaned ${completed.length - recentCompleted.length} old completed assignments`);
+      localStorage.setItem("completedAssignments", JSON.stringify(recentCompleted));
+      setCompletedAssignments(recentCompleted);
+    }
+  };
+  
+  cleanOldCompleted();
+  const interval = setInterval(cleanOldCompleted, 5 * 60 * 1000); // Every 5 minutes
+  return () => clearInterval(interval);
+}, []);
+
 
   // ✅ Save to localStorage
   useEffect(() => {
@@ -415,31 +515,34 @@ const handleUndo = (index) => {
     
     return { titleIndices, dueDates: dueNormalized, strengthWeights: weightNorm };
   };
-    const getRecommendedDueDate = (priority, dueDate) => {
-    if (!isValidDate(dueDate)) return "Invalid Date";
+const getRecommendedDueDate = (priority, dueDate, confidenceWeight = 5) => {
+  if (!isValidDate(dueDate)) return "Invalid Date";
 
-    const today = new Date();
-    const dueDateObj = new Date(dueDate);
+  const today = new Date();
+  const dueDateObj = new Date(dueDate);
+  const diffDays = Math.ceil((dueDateObj - today) / (1000 * 3600 * 24));
 
-    // 🧮 How many days until the assignment is due
-    const diffDays = Math.ceil((dueDateObj - today) / (1000 * 3600 * 24));
+  // 🏗 Dynamic max: 50% of deadline OR 14 days
+  const maxAdjustment = Math.min(14, diffDays * 0.5);
+  
+  // 🎯 COMBINED PRIORITY: 70% model + 30% inverse confidence (weak subjects = earlier)
+  const modelPriority = Math.max(0, Math.min(1, priority));
+  const confidenceBoost = Math.max(0, (10 - confidenceWeight) / 10); // 10=0 boost, 0=1.0 boost
+  const effectivePriority = (modelPriority * 0.7) + (confidenceBoost * 0.3);
+  
+  const adjustment = effectivePriority * maxAdjustment;
 
-    // 📊 Dynamic scaling: farther deadlines allow a larger early adjustment
-    // At most 30% of total time until due, capped at 14 days earlier
-    const maxAdjustment = Math.min(14, diffDays * 0.3);
+  const recommended = new Date(dueDateObj);
+  recommended.setDate(dueDateObj.getDate() - adjustment);
 
-    // 🎯 Higher priority = earlier shift
-    const adjustment = Math.max(0, priority * maxAdjustment);
+  // Bounds
+  if (recommended < today) recommended.setTime(today.getTime());
+  if (recommended > dueDateObj) recommended.setTime(dueDateObj.getTime());
 
-    const recommended = new Date(dueDateObj);
-    recommended.setDate(dueDateObj.getDate() - adjustment);
+  return recommended.toISOString().split("T")[0];
+};
 
-    // 🛡 Ensure the recommended date never goes beyond valid limits
-    if (recommended < today) recommended.setTime(today.getTime());
-    if (recommended > dueDateObj) recommended.setTime(dueDateObj.getTime());
 
-    return recommended.toISOString().split("T")[0];
-  };
 
 
 
@@ -457,14 +560,16 @@ const handleUndo = (index) => {
     }
   };
 
-  const sortedData = sortData(
-    priorityScores.map((score, i) => ({
-      title: userTitles[i] || "Untitled",
-      dueDate: userDueDates[i] || "No Date",
-      priority: score,
-      recommendedDueDate: getRecommendedDueDate(score, userDueDates[i]),
-    }))
-  );
+const sortedData = sortData(
+  priorityScores.map((score, i) => ({
+    title: userTitles[i] || "Untitled",
+    dueDate: userDueDates[i] || "No Date",
+    priority: score,
+    confidence: userStrengthWeights[i] || 5,  // 👈 Pass confidence
+    recommendedDueDate: getRecommendedDueDate(score, userDueDates[i], userStrengthWeights[i] || 5),
+  }))
+);
+
 
   const isLoggedIn = !!localStorage.getItem("google_access_token");
 
