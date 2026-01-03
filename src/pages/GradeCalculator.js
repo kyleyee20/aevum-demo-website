@@ -78,6 +78,7 @@ useEffect(() => {
   }, 1000);
   
   return () => clearTimeout(timer);
+  // eslint-disable-next-line
 }, []); // 👈 Runs ONCE when page opens
 
 
