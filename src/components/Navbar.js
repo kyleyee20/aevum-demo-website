@@ -9,6 +9,7 @@ export default function Navbar() {
     <li><Link to="/priority">Priority List</Link></li>
     <li><Link to="/help">Help Guide</Link></li>
     <li><Link to="/account">Account</Link></li>
+    <li><Link to="/grades">📊 Grade Calculator</Link></li>
     <li><Link to ="/feedback">Feedback</Link></li>
   </ul>
 </nav>

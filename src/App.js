@@ -6,6 +6,7 @@ import HelpGuide from './pages/HelpGuide';
 import PriorityList from './pages/PriorityList';
 import Account from './pages/Account';
 import Feedback from './pages/Feedback';
+import GradeCalculator from './pages/GradeCalculator';
 import './App.css';
 
 function App() {
@@ -174,6 +175,7 @@ function App() {
           <li><Link to="/priority">Priority List</Link></li>
           <li><Link to="/help">Help Guide</Link></li>
           <li><Link to="/account">Account</Link></li>
+          <li><Link to="/grades">📊 Grade Calculator</Link></li> 
           <li><Link to="/feedback">Feedback</Link></li>
         </ul>
       </nav>
@@ -224,6 +226,7 @@ function App() {
         <Route path="/help" element={<HelpGuide />} />
         <Route path="/account" element={<Account />} />
         <Route path="/feedback" element={<Feedback />} />
+        <Route path="/grades" element={<GradeCalculator />} />
       </Routes>
     </Router>
   );
