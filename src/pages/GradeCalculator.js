@@ -6,56 +6,81 @@ export default function GradeCalculator() {
   const [activeCourseId, setActiveCourseId] = useState(null);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
 
-  // 🛠️ FIXED: loadPriorityCourses function defined FIRST
   const loadPriorityCourses = () => {
-    try {
-      const activeTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
-      const completedAssignments = JSON.parse(localStorage.getItem("completedAssignments") || "[]");
-      const completedTitles = completedAssignments.map(item => item.title).filter(Boolean);
-      const allTitles = [...activeTitles, ...completedTitles];
-      
-      const courseCodes = allTitles
-        .filter(title => title && title.trim())
-        .map(title => {
-          const trimmed = title.trim();
-          const codeMatch = trimmed.match(/^([A-Z]{2,4}\s*\d+[A-Z]?)/i);
-          return codeMatch ? codeMatch[1].toUpperCase().trim() : null;
-        })
-        .filter(code => code && code.length >= 4 && code.length <= 8)
-        .filter((code, index, self) => self.indexOf(code) === index)
-        .slice(0, 10);
+  try {
+    const activeTitles = JSON.parse(localStorage.getItem("userTitles") || "[]");
+    const completedAssignments = JSON.parse(localStorage.getItem("completedAssignments") || "[]");
+    const completedTitles = completedAssignments.map(item => item.title).filter(Boolean);
+    const allTitles = [...activeTitles, ...completedTitles];
+    
+    const courseCodes = allTitles
+      .filter(title => title && title.trim())
+      .map(title => {
+        const trimmed = title.trim();
+        const codeMatch = trimmed.match(/^([A-Z]{2,4}\s*\d+[A-Z]?)/i);
+        return codeMatch ? codeMatch[1].toUpperCase().trim() : null;
+      })
+      .filter(code => code && code.length >= 4 && code.length <= 8)
+      .filter((code, index, self) => self.indexOf(code) === index)
+      .slice(0, 10);
 
-      console.log(`📚 Extracted ${courseCodes.length} course codes:`, courseCodes);
+    console.log(`📚 Found ${courseCodes.length} course codes:`, courseCodes);
 
-      if (courseCodes.length > 0) {
-        const newCourses = courseCodes.map((courseCode, index) => ({
-          id: `course${index + 1}`,
-          name: courseCode,
-          source: "priorityList",
-          gradeScale: {
-  Aplus: 97, A: 94, Aminus: 90, Bplus: 87, B: 83, 
-  Bminus: 80, Cplus: 77, C: 73, Cminus: 70, D: 60
-}
-,
-          assignments: [
-            { name: "Midterm", grade: "", weight: 40 },
-            { name: "Final", grade: "", weight: 40 },
-            { name: "Homework", grade: "", weight: 10 },
-            { name: "Quizzes", grade: "", weight: 10 }
-          ]
-        
-        }));
-        
-        setCourses(newCourses);
-        setActiveCourseId(newCourses[0]?.id);
-        setIsLoadingCourses(false);
-        return;
+    // ✅ FIXED: Check localStorage instead of React state
+    const savedCourses = JSON.parse(localStorage.getItem("gradeCalculatorCourses") || "[]");
+    const existingCourseNames = savedCourses.map(c => c.name.toUpperCase());
+    const newCourseCodes = courseCodes.filter(code => !existingCourseNames.includes(code));
+    
+    console.log(`✅ ${newCourseCodes.length} NEW courses (existing: ${savedCourses.length})`);
+
+    if (newCourseCodes.length > 0) {
+      const newCourses = newCourseCodes.map((courseCode) => ({
+        id: `priority_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        name: courseCode,
+        source: "priorityList",
+        gradeScale: {
+          Aplus: 97, A: 94, Aminus: 90, Bplus: 87, B: 83, 
+          Bminus: 80, Cplus: 77, C: 73, Cminus: 70, D: 60
+        },
+        assignments: [
+          { name: "Midterm", grade: "", weight: 40 },
+          { name: "Final", grade: "", weight: 40 },
+          { name: "Homework", grade: "", weight: 10 },
+          { name: "Quizzes", grade: "", weight: 10 }
+        ]
+      }));
+
+      setCourses(prevCourses => {
+        const updated = [...prevCourses, ...newCourses];
+        console.log(`📚 Added ${newCourses.length} new courses. Total: ${updated.length}`);
+        return updated;
+      });
+
+      if (newCourses.length > 0 && !activeCourseId) {
+        setActiveCourseId(newCourses[0].id);
       }
-    } catch (error) {
-      console.log("No priority courses found:", error);
+    } else {
+      console.log("✅ No new courses to add");
     }
-    setIsLoadingCourses(false);
-  };
+  } catch (error) {
+    console.log("❌ Priority courses error:", error);
+  }
+};
+// 🔥 ON-PAGE-LOAD Sync: Check Priority List once when GradeCalculator opens
+useEffect(() => {
+  const token = localStorage.getItem("google_access_token");
+  if (!token) return;
+  
+  // Small delay to ensure localStorage is loaded
+  const timer = setTimeout(() => {
+    console.log("🔍 Page opened → checking Priority List...");
+    loadPriorityCourses();
+  }, 1000);
+  
+  return () => clearTimeout(timer);
+}, []); // 👈 Runs ONCE when page opens
+
+
 
  // 🔥 NEW 1/3 - LOAD ON MOUNT (AFTER loadPriorityCourses function)
 useEffect(() => {
