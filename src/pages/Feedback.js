@@ -15,7 +15,7 @@ export default function Feedback() {
             <h1>Feedback</h1>
             <form className="feedback-form" onSubmit={handleSubmit}>
                 <textarea
-                    placeholder="Please send me an email at "
+                    placeholder="Please send me an email at bvinh@ucsd.edu"
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                 />

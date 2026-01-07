@@ -327,7 +327,7 @@ const getDefaultGrade = (key) => {
   return (
     <div className="container" style={{ maxWidth: "1000px", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
-        <h1>📊 Grade Calculator</h1>
+        <h1> Grade Calculator</h1>
         <div>
           <Link to="/" style={{ color: "#007bff", textDecoration: "none", marginRight: "20px" }}>← Home</Link>
           <button
